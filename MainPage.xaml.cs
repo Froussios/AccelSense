@@ -18,7 +18,8 @@ namespace AccelSense
     public partial class MainPage : PhoneApplicationPage
     {
         private bool recording = false;
-        private Recording recorded;
+        private Recording runningRecording;
+        private IEnumerable<Reading> lastRecording;
         private DispatcherTimer reader;
 
 
@@ -107,7 +108,7 @@ namespace AccelSense
         {
             counted++;
             if (this.recording)
-                this.recorded.Add(reading);
+                this.runningRecording.Add(reading);
 
             if (counted % 10 == 0)
             Deployment.Current.Dispatcher.BeginInvoke(() =>
@@ -119,7 +120,7 @@ namespace AccelSense
 
                 if (this.recording)
                 {
-                    SamplesTextBlock.Text = "Samples: " + this.recorded.Count;
+                    SamplesTextBlock.Text = "Samples: " + this.runningRecording.Count;
                 }
             });
         }
@@ -130,9 +131,9 @@ namespace AccelSense
         /// </summary>
         private void StartRecording()
         {
-            this.recorded = new Recording();
+            this.runningRecording = new Recording();
             this.recording = true;
-            RecordButton.Content = "Save session";
+            RecordButton.Content = "End session";
         }
 
 
@@ -144,7 +145,8 @@ namespace AccelSense
         {
             this.recording = false;
             RecordButton.Content = "Record";
-            return this.recorded;
+            lastRecording = new List<Reading>(runningRecording.Select(x => new Reading(x)));
+            return runningRecording;
         }
 
 
@@ -164,9 +166,9 @@ namespace AccelSense
                 Recording recording = StopRecording();
 
                 IEnumerable<Reading> readings = new List<Reading>(recording.Select(x => new Reading(x)));
-                App.ViewModel.AddSession(readings, ActivityNameInput.Text);
 
-                //DrawChart(recording);
+                String classification = Recording.Analysis.Classify(readings, App.ViewModel.AllSessions);
+                this.RecordingFeedback.Text = "Looking like " + classification;
             } 
         }
 
@@ -232,6 +234,11 @@ namespace AccelSense
             chart.Series.Add(lseriesY);
             chart.Series.Add(lseriesZ);
             return chart;
+        }
+
+        private void SaveSession_Tap(object sender, System.Windows.Input.GestureEventArgs e)
+        {
+            App.ViewModel.AddSession(lastRecording, ActivityNameInput.Text);
         }
     }
 
@@ -321,9 +328,21 @@ namespace AccelSense
             /// <param name="input">The recording to classify.</param>
             /// <param name="training">Past recordings to use as training.</param>
             /// <returns>The activity the recording was classified as.</returns>
-            public String Classify(IEnumerable<AccelerometerReading> input, IEnumerable<Session> training)
+            public static String Classify(IEnumerable<Reading> input, IEnumerable<Session> training)
             {
                 return KNN(input, training);
+            }
+
+
+            /// <summary>
+            /// Classify activity
+            /// </summary>
+            /// <param name="input">The recording to classify.</param>
+            /// <param name="training">Past recordings to use as training.</param>
+            /// <returns>The activity the recording was classified as.</returns>
+            public static String Classify(IEnumerable<AccelerometerReading> input, IEnumerable<Session> training)
+            {
+                return Classify(input.Select(x => new Reading(x)), training);
             }
 
 
@@ -333,8 +352,11 @@ namespace AccelSense
             /// <param name="input"></param>
             /// <param name="training"></param>
             /// <returns></returns>
-            public String KNN(IEnumerable<AccelerometerReading> input, IEnumerable<Session> training)
+            public static String KNN(IEnumerable<Reading> input, IEnumerable<Session> training)
             {
+                if (training == null || training.Count() == 0)
+                    return "(null)";
+
                 Analysis analysis = new Analysis(input);
 
                 // Compare input to every unit in training set
@@ -356,6 +378,8 @@ namespace AccelSense
                                               .OrderByDescending(g => g.Count())
                                               .First()
                                               .Key;
+
+                // TODO Do not favour most populous training
 
                 return plurality;
             }

@@ -34,7 +34,7 @@
         <!--Pivot Control-->
         <phone:Pivot Title="AccelSense">
             <!--Pivot item one-->
-            <phone:PivotItem Header="Raw">
+            <phone:PivotItem Header="Live">
                 <StackPanel Margin="20">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Margin="0,0,10,0">Sensed:</TextBlock>
@@ -66,7 +66,7 @@
                         <Grid>
                             <TextBlock VerticalAlignment="Center" Margin="0,23,381,22">Save as</TextBlock>
                             <TextBox x:Name="ActivityNameInput" Text="Random" Margin="80,0,99,0"/>
-                            <Button Margin="357,0,0,0">Save</Button>
+                            <Button Margin="357,0,0,0" Tap="SaveSession_Tap">Save</Button>
                         </Grid>
                     </StackPanel>
                 </StackPanel>

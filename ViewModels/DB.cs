@@ -379,7 +379,7 @@ namespace AccelSense.ViewModels
         }
 
 
-        public override int HashCode()
+        public override int GetHashCode()
         {
             return this.id;
         }
