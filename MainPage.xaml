@@ -65,8 +65,14 @@
                         <TextBlock Margin="0,30,0,0">Train me</TextBlock>
                         <Grid>
                             <TextBlock VerticalAlignment="Center" Margin="0,23,381,22">Save as</TextBlock>
-                            <TextBox x:Name="ActivityNameInput" Text="Random" Margin="80,0,99,0"/>
+                            <!--<TextBox x:Name="ActivityNameInput" Text="Random" Margin="80,0,99,0"/>-->
+                            <ListBox x:Name="ActivityNameInput" Margin="80,0,99,0">
+                                <ListBoxItem IsSelected="True" >Idle</ListBoxItem>
+                                <ListBoxItem>Walking</ListBoxItem>
+                                <ListBoxItem>Running</ListBoxItem>
+                            </ListBox>
                             <Button Margin="357,0,0,0" Tap="SaveSession_Tap">Save</Button>
+                            <ListBoxItem Content="ListBoxItem" HorizontalAlignment="Left" Margin="231,55,0,0" VerticalAlignment="Top"/>
                         </Grid>
                     </StackPanel>
                 </StackPanel>

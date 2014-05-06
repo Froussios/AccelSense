@@ -106,6 +106,7 @@ namespace AccelSense.ViewModels
         {
             this.DataContext.Readings.InsertOnSubmit(inReading);
             this.DataContext.SubmitChanges();
+            this.LoadReadings();
         }
 
 
@@ -131,6 +132,8 @@ namespace AccelSense.ViewModels
             // Apply to datastore
             this.DataContext.Readings.InsertAllOnSubmit(readings);
             this.DataContext.SubmitChanges();
+
+            this.LoadData();
         }
 
 

@@ -17,8 +17,10 @@ namespace AccelSense
 {
     public partial class MainPage : PhoneApplicationPage
     {
-        private static const int samplingFreq = 10;
-        private static const int samplingMillis = 1000 / samplingFreq;
+        private const int samplingFreq = 10;
+        private const int samplingMillis = 1000 / samplingFreq;
+        private const int partDurationMillis = 2000;
+        private const int partSize = partDurationMillis / samplingMillis;
 
         private bool recording = false;
         private Recording runningRecording;
@@ -248,8 +250,6 @@ namespace AccelSense
         private void SaveSession_Tap(object sender, System.Windows.Input.GestureEventArgs e)
         {
             // Break into parts
-            int partLengthMillis = 5000;
-            int partSize = partLengthMillis / samplingMillis;
             ICollection<IList<Reading>> parts = new List<IList<Reading>>();
             for (int i = 0; i < lastRecording.Count(); i++)
             {
@@ -263,7 +263,7 @@ namespace AccelSense
 
             // Save parts
             foreach (IList<Reading> part in parts)
-                App.ViewModel.AddSession(part, ActivityNameInput.Text);
+                App.ViewModel.AddSession(part, ActivityNameInput.SelectedItem.ToString());
 
             //App.ViewModel.AddSession(lastRecording, ActivityNameInput.Text);
         }
@@ -287,12 +287,18 @@ namespace AccelSense
             public double MaxX { get; protected set; }
             public double MaxY { get; protected set; }
             public double MaxZ { get; protected set; }
-            public double DevX { get; protected set; }
-            public double DevY { get; protected set; }
-            public double DevZ { get; protected set; }
-            public double Dev2X { get; protected set; }
-            public double Dev2Y { get; protected set; }
-            public double Dev2Z { get; protected set; }
+            public double MinX { get; protected set; }
+            public double MinY { get; protected set; }
+            public double MinZ { get; protected set; }
+            public double AmplitudeX { get; protected set; }
+            public double AmplitudeY { get; protected set; }
+            public double AmplitudeZ { get; protected set; }
+            public double VarianceX { get; protected set; }
+            public double VarianceY { get; protected set; }
+            public double VarianceZ { get; protected set; }
+            public double ZeroCrossingsX { get; protected set; }
+            public double ZeroCrossingsY { get; protected set; }
+            public double ZeroCrossingsZ { get; protected set; }
 
 
             /// <summary>
@@ -309,17 +315,34 @@ namespace AccelSense
                 this.MaxY = recording.Max(x => x.accY);
                 this.MaxZ = recording.Max(x => x.accZ);
 
+                this.MinX = recording.Min(x => x.accX);
+                this.MinY = recording.Min(x => x.accY);
+                this.MinZ = recording.Min(x => x.accZ);
+
+                this.AmplitudeX = this.MaxX - this.MinX;
+                this.AmplitudeY = this.MaxY - this.MinY;
+                this.AmplitudeZ = this.MaxZ - this.MinZ;
+
                 this.AverageX = recording.Average(x => x.accX);
                 this.AverageY = recording.Average(x => x.accY);
                 this.AverageZ = recording.Average(x => x.accZ);
 
-                this.DevX = recording.Average(x => Math.Abs(x.accX - AverageX));
-                this.DevY = recording.Average(x => Math.Abs(x.accY - AverageY));
-                this.DevZ = recording.Average(x => Math.Abs(x.accZ - AverageZ));
+                this.VarianceX = recording.Average(x => (x.accX - AverageX) * (x.accX - AverageX));
+                this.VarianceY = recording.Average(x => (x.accY - AverageY) * (x.accY - AverageY));
+                this.VarianceZ = recording.Average(x => (x.accZ - AverageZ) * (x.accZ - AverageZ));
 
-                this.Dev2X = recording.Average(x => (x.accX - AverageX) * (x.accX - AverageX));
-                this.Dev2Y = recording.Average(x => (x.accY - AverageY) * (x.accY - AverageY));
-                this.Dev2Z = recording.Average(x => (x.accZ - AverageZ) * (x.accZ - AverageZ));
+                // Count zero-crossings
+                Reading lastReading = null;
+                foreach (Reading reading in recording)
+                {
+                    if (lastReading != null)
+                    {
+                        if (reading.accX * lastReading.accX < 0) this.ZeroCrossingsX++;
+                        if (reading.accY * lastReading.accY < 0) this.ZeroCrossingsY++;
+                        if (reading.accZ * lastReading.accZ < 0) this.ZeroCrossingsZ++;
+                    }
+                    lastReading = reading;
+                }
             }
 
             
@@ -341,21 +364,15 @@ namespace AccelSense
             {
                 return new double[] 
                 {
-                    this.AverageAbsoluteX,
-                    this.AverageAbsoluteY,
-                    this.AverageAbsoluteZ,
-                    this.MaxX,
-                    this.MaxY,
-                    this.MaxZ,
-                    this.AverageX,
-                    this.AverageY,
-                    this.AverageZ,
-                    this.DevX,
-                    this.DevY,
-                    this.DevZ,
-                    this.Dev2X,
-                    this.Dev2Y,
-                    this.Dev2Z,
+                    this.AmplitudeX,
+                    this.AmplitudeY,
+                    this.AmplitudeZ,
+                    this.VarianceX,
+                    this.VarianceY,
+                    this.VarianceZ,
+                    this.ZeroCrossingsX,
+                    this.ZeroCrossingsY,
+                    this.ZeroCrossingsZ,
                 };
             }
 
