@@ -54,12 +54,14 @@ namespace AccelSense
                 App.ViewModel.LoadData();
             }
 
-            //ShowPreviously(); // The data context does this
-
             Deployment.Current.Dispatcher.BeginInvoke(() =>
             {
                 //Accelerometer.GetDefault().ReadingChanged += MainPage_ReadingChanged;
-                (reader = new DispatcherTimer() { Interval = TimeSpan.FromMilliseconds(samplingMillis) }).Tick += reader_Tick;
+                reader = new DispatcherTimer() 
+                {
+                    Interval = TimeSpan.FromMilliseconds(samplingMillis) 
+                };
+                reader.Tick += reader_Tick;
                 reader.Start();
             });
         }
@@ -73,23 +75,6 @@ namespace AccelSense
         void reader_Tick(object sender, EventArgs e)
         {
             ProcessNewReading(Accelerometer.GetDefault().GetCurrentReading());
-        }
-
-
-        /// <summary>
-        /// Show measurements from the datastore
-        /// </summary>
-        private void ShowPreviously()
-        {
-            foreach (Session session in App.ViewModel.AllSessions)
-            {
-                IEnumerable<Reading> readings = App.ViewModel.AllReadings.Where(x => x.Session.Equals(session));
-                TextBlock tb = new TextBlock() { Text = String.Format("Session {0} ({2}): {1}", session.Id, readings.Count(), session.Activity) };
-                tb.Tap += Session_Tap;
-                tb.DataContext = session;
-
-                DatastorePanel.Children.Add(tb);
-            }
         }
 
 
