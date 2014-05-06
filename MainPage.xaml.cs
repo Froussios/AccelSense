@@ -17,7 +17,8 @@ namespace AccelSense
 {
     public partial class MainPage : PhoneApplicationPage
     {
-        private static const int samplingMillis = 200;
+        private static const int samplingFreq = 10;
+        private static const int samplingMillis = 1000 / samplingFreq;
 
         private bool recording = false;
         private Recording runningRecording;
@@ -238,6 +239,12 @@ namespace AccelSense
             return chart;
         }
 
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void SaveSession_Tap(object sender, System.Windows.Input.GestureEventArgs e)
         {
             // Break into parts
@@ -274,9 +281,18 @@ namespace AccelSense
             public double AverageAbsoluteX { get; protected set; }
             public double AverageAbsoluteY { get; protected set; }
             public double AverageAbsoluteZ { get; protected set; }
+            public double AverageX { get; protected set; }
+            public double AverageY { get; protected set; }
+            public double AverageZ { get; protected set; }
             public double MaxX { get; protected set; }
             public double MaxY { get; protected set; }
             public double MaxZ { get; protected set; }
+            public double DevX { get; protected set; }
+            public double DevY { get; protected set; }
+            public double DevZ { get; protected set; }
+            public double Dev2X { get; protected set; }
+            public double Dev2Y { get; protected set; }
+            public double Dev2Z { get; protected set; }
 
 
             /// <summary>
@@ -291,10 +307,22 @@ namespace AccelSense
 
                 this.MaxX = recording.Max(x => x.accX);
                 this.MaxY = recording.Max(x => x.accY);
-                this.MaxZ = recording.Max(x => x.accZ);    
+                this.MaxZ = recording.Max(x => x.accZ);
+
+                this.AverageX = recording.Average(x => x.accX);
+                this.AverageY = recording.Average(x => x.accY);
+                this.AverageZ = recording.Average(x => x.accZ);
+
+                this.DevX = recording.Average(x => Math.Abs(x.accX - AverageX));
+                this.DevY = recording.Average(x => Math.Abs(x.accY - AverageY));
+                this.DevZ = recording.Average(x => Math.Abs(x.accZ - AverageZ));
+
+                this.Dev2X = recording.Average(x => (x.accX - AverageX) * (x.accX - AverageX));
+                this.Dev2Y = recording.Average(x => (x.accY - AverageY) * (x.accY - AverageY));
+                this.Dev2Z = recording.Average(x => (x.accZ - AverageZ) * (x.accZ - AverageZ));
             }
 
-
+            
             /// <summary>
             /// Analyse a series of measurements
             /// </summary>
@@ -302,6 +330,33 @@ namespace AccelSense
             public Analysis(IEnumerable<AccelerometerReading> recording)
                 : this(recording.Select(x => new Reading(x)))
             {
+            }
+
+
+            /// <summary>
+            /// Convert the analysis to an unweighted vector
+            /// </summary>
+            /// <returns>The vector</returns>
+            public IList<double> ToVector()
+            {
+                return new double[] 
+                {
+                    this.AverageAbsoluteX,
+                    this.AverageAbsoluteY,
+                    this.AverageAbsoluteZ,
+                    this.MaxX,
+                    this.MaxY,
+                    this.MaxZ,
+                    this.AverageX,
+                    this.AverageY,
+                    this.AverageZ,
+                    this.DevX,
+                    this.DevY,
+                    this.DevZ,
+                    this.Dev2X,
+                    this.Dev2Y,
+                    this.Dev2Z,
+                };
             }
 
 
@@ -402,24 +457,6 @@ namespace AccelSense
                 // TODO Do not favour most populous training
 
                 return plurality;
-            }
-
-
-            /// <summary>
-            /// Convert the analysis to an unweighted vector
-            /// </summary>
-            /// <returns>The vector</returns>
-            public IList<double> ToVector()
-            {
-                return new double[] 
-                {
-                    this.AverageAbsoluteX,
-                    this.AverageAbsoluteY,
-                    this.AverageAbsoluteZ,
-                    this.MaxX,
-                    this.MaxY,
-                    this.MaxZ,
-                };
             }
 
 
