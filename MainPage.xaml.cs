@@ -17,9 +17,11 @@ namespace AccelSense
 {
     public partial class MainPage : PhoneApplicationPage
     {
+        private static const int samplingMillis = 200;
+
         private bool recording = false;
         private Recording runningRecording;
-        private IEnumerable<Reading> lastRecording;
+        private IList<Reading> lastRecording;
         private DispatcherTimer reader;
 
 
@@ -54,7 +56,7 @@ namespace AccelSense
             Deployment.Current.Dispatcher.BeginInvoke(() =>
             {
                 //Accelerometer.GetDefault().ReadingChanged += MainPage_ReadingChanged;
-                (reader = new DispatcherTimer() { Interval = TimeSpan.FromMilliseconds(500) }).Tick += reader_Tick;
+                (reader = new DispatcherTimer() { Interval = TimeSpan.FromMilliseconds(samplingMillis) }).Tick += reader_Tick;
                 reader.Start();
             });
         }
@@ -238,7 +240,25 @@ namespace AccelSense
 
         private void SaveSession_Tap(object sender, System.Windows.Input.GestureEventArgs e)
         {
-            App.ViewModel.AddSession(lastRecording, ActivityNameInput.Text);
+            // Break into parts
+            int partLengthMillis = 5000;
+            int partSize = partLengthMillis / samplingMillis;
+            ICollection<IList<Reading>> parts = new List<IList<Reading>>();
+            for (int i = 0; i < lastRecording.Count(); i++)
+            {
+                // Start new part
+                if (i % partSize == 0)
+                    parts.Add(new List<Reading>(partSize));
+
+                // Add to last part
+                parts.Last().Add(lastRecording[i]);
+            }
+
+            // Save parts
+            foreach (IList<Reading> part in parts)
+                App.ViewModel.AddSession(part, ActivityNameInput.Text);
+
+            //App.ViewModel.AddSession(lastRecording, ActivityNameInput.Text);
         }
     }
 
