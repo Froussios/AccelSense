@@ -100,9 +100,10 @@ namespace AccelSense
             if (this.recording)
                 this.runningRecording.Add(reading);
 
-            if (counted % 10 == 0)
-            Deployment.Current.Dispatcher.BeginInvoke(() =>
+            if (counted % samplingFreq == 0) // Update every 1 second
             {
+                //Deployment.Current.Dispatcher.BeginInvoke(() =>
+                //{
                 AccX.Text = "" + reading.AccelerationX;
                 AccY.Text = "" + reading.AccelerationY;
                 AccZ.Text = "" + reading.AccelerationZ;
@@ -112,7 +113,8 @@ namespace AccelSense
                 {
                     SamplesTextBlock.Text = "Samples: " + this.runningRecording.Count;
                 }
-            });
+                //});
+            }
         }
 
 
@@ -161,7 +163,7 @@ namespace AccelSense
                 String classification = Recording.Analysis.Classify(readings, App.ViewModel.AllSessions);
                 this.RecordingFeedback.Text = "Looking like " + classification;
 
-                // TODO Clasify as parts
+                // Clasify as parts
                 String activitySequence = "";
                 ICollection<IList<Reading>> parts = BreakRecording(readings);
                 foreach (IList<Reading> part in parts)
@@ -169,8 +171,14 @@ namespace AccelSense
                     String partClass = Recording.Analysis.Classify(part, App.ViewModel.AllSessions);
                     activitySequence += partClass.First();
                 }
+
+                // Add marker every 30s
+                for (int i = 0; i < activitySequence.Length; i += 16)
+                {
+                    activitySequence = activitySequence.Insert(i, "$");
+                }
                 this.DetailedResults.Text = activitySequence;
-            } 
+            }
         }
 
 
@@ -269,6 +277,52 @@ namespace AccelSense
 
             return parts;
         }
+
+
+        /// <summary>
+        /// Calculate and print the distance between two sessions
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void CompareButton_Tap(object sender, System.Windows.Input.GestureEventArgs e)
+        {
+            int sessionId1;
+            int sessionId2;
+            Boolean parsed = false;
+            parsed = int.TryParse(CompareInput1.Text, out sessionId1);
+            parsed = int.TryParse(CompareInput2.Text, out sessionId2) && parsed;
+
+            if (parsed)
+            {
+                Session session1 = App.ViewModel.GetSession(sessionId1);
+                Session session2 = App.ViewModel.GetSession(sessionId2);
+
+                IEnumerable<Reading> readings1 = App.ViewModel.GetReadings(session1);
+                IEnumerable<Reading> readings2 = App.ViewModel.GetReadings(session2);
+
+                Recording.Analysis analysis1 = new Recording.Analysis(readings1);
+                Recording.Analysis analysis2 = new Recording.Analysis(readings2);
+
+                double distance1 = analysis1.DistanceFrom(analysis2);
+                double distance2 = analysis2.DistanceFrom(analysis1);
+
+                CompareResults.Text = "";
+                CompareResults.Text = String.Format("Distance: {0} ({1})\n Ids: {2}, {3}\n Stamps: {4}, {5}",
+                                                    distance1, distance2,
+                                                    session1.Id, session2.Id,
+                                                    analysis1.Stamp(), analysis2.Stamp());
+            }
+            else
+            {
+                CompareResults.Text = "Provide two session ids";
+            }
+        }
+
+        private void Button_Tap(object sender, System.Windows.Input.GestureEventArgs e)
+        {
+            RecordingChartContainer.Children.Clear();
+            RecordingChartContainer.Children.Add(DrawChart(lastRecording));
+        }
     }
 
 
@@ -298,9 +352,9 @@ namespace AccelSense
             public double VarianceX { get; protected set; }
             public double VarianceY { get; protected set; }
             public double VarianceZ { get; protected set; }
-            public double ZeroCrossingsX { get; protected set; }
-            public double ZeroCrossingsY { get; protected set; }
-            public double ZeroCrossingsZ { get; protected set; }
+            public double AverageCrossingsX { get; protected set; }
+            public double AverageCrossingsY { get; protected set; }
+            public double AverageCrossingsZ { get; protected set; }
 
 
             /// <summary>
@@ -339,9 +393,9 @@ namespace AccelSense
                 {
                     if (lastReading != null)
                     {
-                        if (reading.accX * lastReading.accX < 0) this.ZeroCrossingsX++;
-                        if (reading.accY * lastReading.accY < 0) this.ZeroCrossingsY++;
-                        if (reading.accZ * lastReading.accZ < 0) this.ZeroCrossingsZ++;
+                        if ((reading.accX - AverageX) * (lastReading.accX - AverageX) < 0) this.AverageCrossingsX++;
+                        if ((reading.accY - AverageY) * (lastReading.accY - AverageY) < 0) this.AverageCrossingsY++;
+                        if ((reading.accZ - AverageZ) * (lastReading.accZ - AverageZ) < 0) this.AverageCrossingsZ++;
                     }
                     lastReading = reading;
                 }
@@ -354,6 +408,10 @@ namespace AccelSense
             /// <param name="recording"></param>
             public Analysis(IEnumerable<AccelerometerReading> recording)
                 : this(recording.Select(x => new Reading(x)))
+            {
+            }
+
+            private Analysis()
             {
             }
 
@@ -372,9 +430,9 @@ namespace AccelSense
                     this.VarianceX,
                     this.VarianceY,
                     this.VarianceZ,
-                    this.ZeroCrossingsX,
-                    this.ZeroCrossingsY,
-                    this.ZeroCrossingsZ,
+                    //this.AverageCrossingsX,
+                    //this.AverageCrossingsY,
+                    //this.AverageCrossingsZ,
                 };
             }
 
@@ -387,7 +445,7 @@ namespace AccelSense
             public double DistanceFrom(Analysis other)
             {
                 IList<double> v1 = this.ToVector();
-                IList<double> v2 = this.ToVector();
+                IList<double> v2 = other.ToVector();
 
                 return EuclideanDistance(v1, v2);
             }
@@ -413,6 +471,19 @@ namespace AccelSense
                 }
 
                 return Math.Sqrt(sum);
+            }
+
+
+            /// <summary>
+            /// Get the normalised euclidean distance between two vectors
+            /// </summary>
+            /// <param name="v1"></param>
+            /// <param name="v2"></param>
+            /// <param name="stdDevs">The standard deviation for every dimension</param>
+            /// <returns></returns>
+            public static double NormalisedEuclideanDistance(IList<double> v1, IList<double> v2, IList<double> stdDevs)
+            {
+                throw new NotImplementedException();
             }
 
 
@@ -463,8 +534,9 @@ namespace AccelSense
                 }
 
                 // Get K closest neighbours
-                int K = 10;
-                IEnumerable<int> KNeighbours = scores.Keys.OrderByDescending(x => scores[x]).
+                // Smaller score is closer
+                int K = (int)Math.Sqrt(training.Count());
+                IEnumerable<int> KNeighbours = scores.Keys.OrderBy(x => scores[x]).
                                                            Take(K);
               
                 // Find plurality in neighbours
@@ -480,12 +552,49 @@ namespace AccelSense
 
 
             /// <summary>
+            /// Calculate the standard deviations for the Normalised Euclidean Distance
+            /// </summary>
+            /// <param name="analyses"></param>
+            /// <returns></returns>
+            private static IList<double> GetStandardDeviations(IEnumerable<Analysis> analyses)
+            {
+                Analysis averages = new Analysis();
+                averages.AmplitudeX = analyses.Average(a => a.AmplitudeX);
+                averages.AmplitudeY = analyses.Average(a => a.AmplitudeY);
+                averages.AmplitudeZ = analyses.Average(a => a.AmplitudeZ);
+                averages.VarianceX = analyses.Average(a => a.VarianceX);
+                averages.VarianceY = analyses.Average(a => a.VarianceY);
+                averages.VarianceZ = analyses.Average(a => a.VarianceZ);
+
+                Analysis standardDeviations = new Analysis();
+                standardDeviations.AmplitudeX = Math.Sqrt(analyses.Average(a => a.AmplitudeX * a.AmplitudeX) - averages.AmplitudeX);
+                standardDeviations.AmplitudeY = Math.Sqrt(analyses.Average(a => a.AmplitudeY * a.AmplitudeY) - averages.AmplitudeY);
+                standardDeviations.AmplitudeZ = Math.Sqrt(analyses.Average(a => a.AmplitudeZ * a.AmplitudeZ) - averages.AmplitudeZ);
+                standardDeviations.VarianceX = Math.Sqrt(analyses.Average(a => a.VarianceX * a.VarianceX) - averages.VarianceX);
+                standardDeviations.VarianceY = Math.Sqrt(analyses.Average(a => a.VarianceY * a.VarianceY) - averages.VarianceY);
+                standardDeviations.VarianceZ = Math.Sqrt(analyses.Average(a => a.VarianceZ * a.VarianceZ) - averages.VarianceZ);
+
+                return standardDeviations.ToVector();
+            }
+
+
+            /// <summary>
             /// Human-readable representation of the analysis
             /// </summary>
             /// <returns></returns>
             public override String ToString()
             {
                 return String.Format("X({0}, {3}) Y({1}, {4}) Z({2}, {5})", AverageAbsoluteX, AverageAbsoluteY, AverageAbsoluteZ, MaxX, MaxY, MaxZ);
+            }
+
+
+            /// <summary>
+            /// Quick value for distringuishing analyses
+            /// </summary>
+            /// <returns></returns>
+            public double Stamp()
+            {
+                return this.ToVector().Sum();
             }
         }
     }
