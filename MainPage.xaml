@@ -72,9 +72,10 @@
                                 <ListBoxItem>Running</ListBoxItem>
                             </ListBox>
                             <Button Margin="357,0,0,0" Tap="SaveSession_Tap">Save</Button>
-                            <ListBoxItem Content="ListBoxItem" HorizontalAlignment="Left" Margin="231,55,0,0" VerticalAlignment="Top"/>
                         </Grid>
                     </StackPanel>
+                    <TextBlock>Results:</TextBlock>
+                    <TextBlock x:Name="DetailedResults"></TextBlock>
                 </StackPanel>
             </phone:PivotItem>
             <phone:PivotItem Header="Datastore">

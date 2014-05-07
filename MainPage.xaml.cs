@@ -17,7 +17,7 @@ namespace AccelSense
 {
     public partial class MainPage : PhoneApplicationPage
     {
-        private const int samplingFreq = 10;
+        private const int samplingFreq = 20;
         private const int samplingMillis = 1000 / samplingFreq;
         private const int partDurationMillis = 2000;
         private const int partSize = partDurationMillis / samplingMillis;
@@ -155,10 +155,21 @@ namespace AccelSense
             {
                 Recording recording = StopRecording();
 
-                IEnumerable<Reading> readings = new List<Reading>(recording.Select(x => new Reading(x)));
+                IList<Reading> readings = new List<Reading>(recording.Select(x => new Reading(x)));
 
+                // Classify whole
                 String classification = Recording.Analysis.Classify(readings, App.ViewModel.AllSessions);
                 this.RecordingFeedback.Text = "Looking like " + classification;
+
+                // TODO Clasify as parts
+                String activitySequence = "";
+                ICollection<IList<Reading>> parts = BreakRecording(readings);
+                foreach (IList<Reading> part in parts)
+                {
+                    String partClass = Recording.Analysis.Classify(part, App.ViewModel.AllSessions);
+                    activitySequence += partClass.First();
+                }
+                this.DetailedResults.Text = activitySequence;
             } 
         }
 
@@ -175,12 +186,6 @@ namespace AccelSense
 
             NavigationService.Navigate(new Uri("/ViewSession.xaml?sessionId=" + session.Id, UriKind.Relative));
             return;
-
-            ChartGrid.Children.Clear();
-            ChartGrid.Children.Add(DrawChart(session));
-
-            Recording.Analysis analysis = new Recording.Analysis(App.ViewModel.GetReadings(session));
-            ChartGrid.Children.Add(new TextBlock() { Text = analysis.ToString() });
         }
 
 
@@ -235,22 +240,34 @@ namespace AccelSense
         private void SaveSession_Tap(object sender, System.Windows.Input.GestureEventArgs e)
         {
             // Break into parts
-            ICollection<IList<Reading>> parts = new List<IList<Reading>>();
-            for (int i = 0; i < lastRecording.Count(); i++)
+            ICollection<IList<Reading>> parts = BreakRecording(lastRecording);
+
+            // Save parts
+            foreach (IList<Reading> part in parts)
+                App.ViewModel.AddSession(part, (ActivityNameInput.SelectedItem as ListBoxItem).Content.ToString());
+        }
+
+
+        /// <summary>
+        /// Breaks recording into parts of equal size
+        /// </summary>
+        /// <param name="parts"></param>
+        /// <returns></returns>
+        private ICollection<IList<Reading>> BreakRecording(IList<Reading> recording)
+        {
+            ICollection<IList<Reading>>  parts = new List<IList<Reading>>();
+
+            for (int i = 0; i < recording.Count(); i++)
             {
                 // Start new part
                 if (i % partSize == 0)
                     parts.Add(new List<Reading>(partSize));
 
                 // Add to last part
-                parts.Last().Add(lastRecording[i]);
+                parts.Last().Add(recording[i]);
             }
 
-            // Save parts
-            foreach (IList<Reading> part in parts)
-                App.ViewModel.AddSession(part, ActivityNameInput.SelectedItem.ToString());
-
-            //App.ViewModel.AddSession(lastRecording, ActivityNameInput.Text);
+            return parts;
         }
     }
 
@@ -432,7 +449,7 @@ namespace AccelSense
             public static String KNN(IEnumerable<Reading> input, IEnumerable<Session> training)
             {
                 if (training == null || training.Count() == 0)
-                    return "(null)";
+                    return "?";
 
                 Analysis analysis = new Analysis(input);
 
@@ -447,14 +464,14 @@ namespace AccelSense
 
                 // Get K closest neighbours
                 int K = 10;
-                IEnumerable<int> KNeighbours = scores.Keys.OrderByDescending(x => scores[x])
-                                                          .Take(K);
+                IEnumerable<int> KNeighbours = scores.Keys.OrderByDescending(x => scores[x]).
+                                                           Take(K);
               
                 // Find plurality in neighbours
-                String plurality = KNeighbours.GroupBy(x => App.ViewModel.GetSession(x).Activity)
-                                              .OrderByDescending(g => g.Count())
-                                              .First()
-                                              .Key;
+                String plurality = KNeighbours.GroupBy(x => App.ViewModel.GetSession(x).Activity).
+                                               OrderByDescending(g => g.Count()).
+                                               First().
+                                               Key;
 
                 // TODO Do not favour most populous training
 
